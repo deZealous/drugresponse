@@ -1,0 +1,12 @@
+name: drp
+channels: [conda-forge, pytorch]
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - cudatoolkit=11.8  # (if GPU; else remove)
+  - pip
+  - pip:
+      - pandas pyarrow numpy scikit-learn lightgbm optuna shap captum
+      - rdkit-pypi
+      - mlflow
