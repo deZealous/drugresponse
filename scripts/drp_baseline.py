@@ -17,7 +17,7 @@ Usage (from project root):
       --gdsc2 /mnt/data/GDSC2_fitted_dose_response_27Oct23.xlsx \
       --compounds /mnt/data/screened_compounds_rel_8.5.csv \
       --cells /mnt/data/Cell_Lines_Details.xlsx \
-      --expr_zip /mnt/data/Cell_line_RMA_proc_basalExp.txt.zip
+      --expr_zip /mnt/data/Cell_line_RMA_proc_basalExp.txt
 
 Requires: pandas, numpy, scikit-learn, rdkit-pypi, lightgbm, optuna, scipy
 """
@@ -328,7 +328,7 @@ if __name__ == "__main__":
     ap.add_argument("--gdsc2", required=True)
     ap.add_argument("--compounds", required=True)
     ap.add_argument("--cells", required=True)
-    ap.add_argument("--expr_zip", required=True, help="Path to Cell_line_RMA_proc_basalExp.txt.zip")
+    ap.add_argument("--expr_zip", required=True, help="Path to Cell_line_RMA_proc_basalExp.txt")
     ap.add_argument("--top_genes", type=int, default=5000)
     ap.add_argument("--pcs", type=int, default=512)
     ap.add_argument("--fp_bits", type=int, default=1024)

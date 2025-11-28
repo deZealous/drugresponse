@@ -1,4 +1,4 @@
-import os, argparse, warnings
+﻿import os, argparse, warnings
 import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -62,7 +62,7 @@ def load_cells(path):
     elif fallback_tissue:
         out["tissue"] = df[fallback_tissue].astype(str)
     else:
-        print("⚠️  load_cells: no tissue columns found; setting tissue='unknown'.")
+        print("  load_cells: no tissue columns found; setting tissue='unknown'.")
         out["tissue"] = "unknown"
 
     out["tissue"] = out["tissue"].fillna("unknown").str.strip()
@@ -94,37 +94,30 @@ def process_expression_zip(expr_zip, topk=5000, pcs=512):
             raise FileNotFoundError(f"Expression file not found: {expr_zip}")
     else:
         # File exists, try reading it
+        print(f"Reading expression file: {expr_zip}")
         try:
             expr = pd.read_csv(expr_zip, sep="\t")
+            print(f"Successfully read as plain text. Shape: {expr.shape}")
         except Exception as e:
+            print(f"Plain text read failed: {e}")
             # If plain text fails, try as zip
             try:
                 expr = pd.read_csv(expr_zip, sep="\t", compression="zip")
+                print(f"Successfully read as zip. Shape: {expr.shape}")
             except Exception as e2:
                 raise Exception(f"Failed to read {expr_zip} as both plain text and zip. Plain text error: {e}, Zip error: {e2}")
     
     gene_col = expr.columns[0]
     expr = expr.set_index(gene_col).T  # rows = cell lines (COSMIC), cols = genes
     expr.index.name = "cell_id"
-    
-    # Strip "DATA." prefix from cell IDs if present and remove header row
-    expr.index = expr.index.str.replace("DATA.", "", regex=False)
-    # Remove the GENE_title row if it exists (it's the column header, not a cell line)
-    if "GENE_title" in expr.index:
-        expr = expr.drop("GENE_title")
 
     # numeric only
     expr = expr.apply(pd.to_numeric, errors="coerce")
-    
-    # Drop columns where ALL values are NaN (completely non-numeric)
-    expr = expr.dropna(axis=1, how="all")
-    
-    # For remaining columns, fill NaN with column mean (imputation)
-    expr = expr.fillna(expr.mean())
+    expr = expr.dropna(axis=1, how="any")
 
     # variance filter
     var = expr.var(axis=0)
-    keep = var.sort_values(ascending=False).head(min(topk, len(var))).index
+    keep = var.sort_values(ascending=False).head(topk).index
     expr = expr[keep]
 
     # z-score then PCA
@@ -161,7 +154,7 @@ def main(args):
     resp["SMILES"] = resp["SMILES"].astype(str).replace({"nan": np.nan})
     resp["SMILES"] = resp["SMILES"].apply(canonical_smiles).fillna("")
 
-    # (cell,drug) replicates → median ln_ic50
+    # (cell,drug) replicates  median ln_ic50
     resp = (resp
             .groupby(["COSMIC_ID","DRUG_ID","DRUG_NAME","SMILES","tissue","dataset"], as_index=False)["LN_IC50"]
             .median())
@@ -174,9 +167,6 @@ def main(args):
         "COSMIC_ID":"cell_id","DRUG_ID":"drug_id","DRUG_NAME":"drug_name",
         "SMILES":"smiles","LN_IC50":"ln_ic50"
     })
-    
-    # Convert cell_id to string to match expression index
-    resp["cell_id"] = resp["cell_id"].astype(str)
 
     # save tidy pairs
     pairs_path = os.path.join(out, "gdsc_pairs.parquet")
@@ -189,9 +179,6 @@ def main(args):
     expr_pca.to_parquet(expr_path)
 
     # 6) Merge
-    # Convert expression index to string to match response cell_id
-    expr_pca.index = expr_pca.index.astype(str)
-    
     merged = resp.merge(expr_pca, left_on="cell_id", right_index=True, how="inner")
     merged_path = os.path.join(out, "merged.parquet")
     merged.to_parquet(merged_path, index=False)

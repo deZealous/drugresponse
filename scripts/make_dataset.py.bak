@@ -1,8 +1,11 @@
-import os, argparse, warnings
+import os, math, argparse, warnings
 import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from rdkit import Chem
+from rdkit.Chem import Descriptors
+
+
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -24,6 +27,15 @@ def load_ic50(xlsx_path, tag):
     df["dataset"] = tag
     return df
 
+def load_compounds(path):
+    df = pd.read_csv(path)
+    c = ci_map(df)
+    drug = c.get("drug id") or c.get("drug_id") or "Drug id"
+    smi  = c.get("smiles") or "SMILES"
+    out = df[[drug, smi]].drop_duplicates()
+    out.columns = ["DRUG_ID","SMILES"]
+    return out
+
 def load_cells(path):
     df = pd.read_excel(path)
     print(f"Reading cell metadata from: {path}")
@@ -42,9 +54,8 @@ def load_cells(path):
         raise KeyError(f"No COSMIC column found. Got: {list(df.columns)}")
 
     # --- Tissue columns (GDSC Tissue descriptor 1/2, or fallbacks) ---
-    # Check for keys with potential newlines or spaces
-    gdsc_t1 = next((cols[k] for k in cols if "gdsc" in k and "tissue" in k and "descriptor" in k and ("1" in k or k.endswith("descriptor"))), None)
-    gdsc_t2 = next((cols[k] for k in cols if "gdsc" in k and "tissue" in k and "descriptor" in k and "2" in k), None)
+    gdsc_t1 = cols.get("gdsc tissue descriptor 1")
+    gdsc_t2 = cols.get("gdsc tissue descriptor 2")
     other_tissue_keys = ["tissue descriptor","tissue","primary tissue","primary site","site","cancer type"]
     fallback_tissue = next((cols[k] for k in other_tissue_keys if k in cols), None)
 
@@ -62,7 +73,7 @@ def load_cells(path):
     elif fallback_tissue:
         out["tissue"] = df[fallback_tissue].astype(str)
     else:
-        print("⚠️  load_cells: no tissue columns found; setting tissue='unknown'.")
+        print("WARNING load_cells: no tissue columns found; setting tissue='unknown'.")
         out["tissue"] = "unknown"
 
     out["tissue"] = out["tissue"].fillna("unknown").str.strip()
@@ -84,47 +95,28 @@ def winsorize(series, lo=0.005, hi=0.995):
     return series.clip(lower=ql, upper=qh)
 
 def process_expression_zip(expr_zip, topk=5000, pcs=512):
-    # GDSC1000: genes x cell_lines (or the reverse) tsv (can be plain text or zipped)
-    # Try to read as plain text first, then try zip
-    if not os.path.exists(expr_zip):
-        zip_path = expr_zip + ".zip"
-        if os.path.exists(zip_path):
-            expr = pd.read_csv(zip_path, sep="\t", compression="zip")
-        else:
-            raise FileNotFoundError(f"Expression file not found: {expr_zip}")
+    # GDSC expression matrix ships either as a bare .txt or zipped file.
+    if os.path.exists(expr_zip):
+        expr_path = expr_zip
     else:
-        # File exists, try reading it
-        try:
-            expr = pd.read_csv(expr_zip, sep="\t")
-        except Exception as e:
-            # If plain text fails, try as zip
-            try:
-                expr = pd.read_csv(expr_zip, sep="\t", compression="zip")
-            except Exception as e2:
-                raise Exception(f"Failed to read {expr_zip} as both plain text and zip. Plain text error: {e}, Zip error: {e2}")
-    
+        zip_candidate = expr_zip if expr_zip.endswith(".zip") else expr_zip + ".zip"
+        if not os.path.exists(zip_candidate):
+            raise FileNotFoundError(f"Expression file not found: {expr_zip} (.zip fallback also missing)")
+        expr_path = zip_candidate
+
+    compression = "zip" if expr_path.endswith(".zip") else None
+    expr = pd.read_csv(expr_path, sep="\t", compression=compression)
     gene_col = expr.columns[0]
     expr = expr.set_index(gene_col).T  # rows = cell lines (COSMIC), cols = genes
     expr.index.name = "cell_id"
-    
-    # Strip "DATA." prefix from cell IDs if present and remove header row
-    expr.index = expr.index.str.replace("DATA.", "", regex=False)
-    # Remove the GENE_title row if it exists (it's the column header, not a cell line)
-    if "GENE_title" in expr.index:
-        expr = expr.drop("GENE_title")
 
     # numeric only
     expr = expr.apply(pd.to_numeric, errors="coerce")
-    
-    # Drop columns where ALL values are NaN (completely non-numeric)
-    expr = expr.dropna(axis=1, how="all")
-    
-    # For remaining columns, fill NaN with column mean (imputation)
-    expr = expr.fillna(expr.mean())
+    expr = expr.dropna(axis=1, how="any")
 
     # variance filter
     var = expr.var(axis=0)
-    keep = var.sort_values(ascending=False).head(min(topk, len(var))).index
+    keep = var.sort_values(ascending=False).head(topk).index
     expr = expr[keep]
 
     # z-score then PCA
@@ -148,7 +140,7 @@ def main(args):
     gdsc2 = load_ic50(os.path.join(raw, "GDSC2_fitted_dose_response_27Oct23.xlsx"), "GDSC2")
     resp = pd.concat([gdsc1, gdsc2], ignore_index=True)
 
-    # 2) Compounds (SMILES) — use enriched mapping
+    # 2) Compounds (SMILES)
     cmpd = pd.read_csv("data/processed/compounds_with_smiles.csv")[["DRUG_ID", "SMILES"]]
     resp = resp.merge(cmpd, on="DRUG_ID", how="left")
 
@@ -156,12 +148,15 @@ def main(args):
     cells = load_cells(os.path.join(raw, args.cell_file))
     resp = resp.merge(cells, left_on="COSMIC_ID", right_on="COSMIC_ID", how="left")
 
-    # 4) Basic cleaning — drop missing IC50; canonicalize SMILES; keep unmatched drugs
+    # 4) Basic cleaning - drop missing IC50; canonicalize SMILES
     resp = resp.dropna(subset=["LN_IC50"])
     resp["SMILES"] = resp["SMILES"].astype(str).replace({"nan": np.nan})
-    resp["SMILES"] = resp["SMILES"].apply(canonical_smiles).fillna("")
+    resp["SMILES"] = resp["SMILES"].apply(canonical_smiles)
+    resp["SMILES"] = resp["SMILES"].fillna("")  # keep unmatched drugs
 
-    # (cell,drug) replicates → median ln_ic50
+ 
+
+    # (cell,drug) replicates -> median ln_ic50
     resp = (resp
             .groupby(["COSMIC_ID","DRUG_ID","DRUG_NAME","SMILES","tissue","dataset"], as_index=False)["LN_IC50"]
             .median())
@@ -174,29 +169,23 @@ def main(args):
         "COSMIC_ID":"cell_id","DRUG_ID":"drug_id","DRUG_NAME":"drug_name",
         "SMILES":"smiles","LN_IC50":"ln_ic50"
     })
-    
-    # Convert cell_id to string to match expression index
-    resp["cell_id"] = resp["cell_id"].astype(str)
 
     # save tidy pairs
     pairs_path = os.path.join(out, "gdsc_pairs.parquet")
     resp.to_parquet(pairs_path, index=False)
 
-    # 5) Expression PCs (note: .zip!)
-    expr_zip = os.path.join(raw, "Cell_line_RMA_proc_basalExp.txt")
+    # 5) Expression PCs
+    expr_zip = os.path.join(raw, "Cell_line_RMA_proc_basalExp.txt.zip")
     expr_pca = process_expression_zip(expr_zip, topk=args.top_genes, pcs=args.pcs)
     expr_path = os.path.join(out, "gdsc_expr_pca.parquet")
     expr_pca.to_parquet(expr_path)
 
     # 6) Merge
-    # Convert expression index to string to match response cell_id
-    expr_pca.index = expr_pca.index.astype(str)
-    
     merged = resp.merge(expr_pca, left_on="cell_id", right_index=True, how="inner")
     merged_path = os.path.join(out, "merged.parquet")
     merged.to_parquet(merged_path, index=False)
 
-    # sanity prints
+    # simple sanity prints
     print("pairs:", resp.shape, " ->", pairs_path)
     print("expr_pca:", expr_pca.shape, " ->", expr_path)
     print("merged:", merged.shape, " ->", merged_path)
@@ -211,3 +200,4 @@ if __name__ == "__main__":
     ap.add_argument("--pcs", type=int, default=512)
     args = ap.parse_args()
     main(args)
+
