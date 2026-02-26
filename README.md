@@ -696,7 +696,7 @@ Contributions welcome! Areas for improvement:
 
 ## 📧 Contact
 
-For questions or issues, please open a GitHub issue or contact [your.email@example.com]
+For questions or issues, please open a GitHub issue or contact [hrm012@gmail.com]
 
 ---
 
