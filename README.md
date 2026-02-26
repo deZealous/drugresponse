@@ -366,6 +366,108 @@ notebooks/ensemble_model_colab.ipynb
 ✅ **Ensemble provides consistent gains** (+1.56% over best individual)  
 ✅ **Drug-based splits prevent data leakage** (realistic evaluation)
 
+---
+
+## 🖼️ Visual Results
+
+### Model Performance on Test Set
+
+Bar charts comparing RMSE, MAE, and Spearman Correlation across all models.
+
+![Model Performance Bars](docs/images/model_performance_bars.png)
+
+---
+
+### Normalized Performance Comparison
+
+All metrics normalized to a 0–1 scale (higher = better) for side-by-side comparison.
+
+![Normalized Model Performance](docs/images/model_performance_normalized.png)
+
+---
+
+### Performance Heatmap
+
+A color-coded heatmap of (normalized) metric values across every model and metric.  
+Green = best, Red = worst.
+
+![Model Performance Heatmap](docs/images/model_performance_heatmap.png)
+
+---
+
+### Model Prediction Correlation
+
+How correlated are the predictions of individual models?  
+Lower inter-model correlation means more complementary predictions — better for ensembling.
+
+![Model Prediction Correlation](docs/images/model_prediction_correlation.png)
+
+---
+
+### Scatter Plot Matrix (SPLOM)
+
+Pairwise comparison of true IC50 values vs. each model's predictions.
+
+![Model SPLOM](docs/images/model_splom.png)
+
+---
+
+### Error Distribution Analysis
+
+Absolute error histograms, cumulative distribution, and boxplots for MLP Baseline vs. MLP + ChemBERTa.
+
+![Error Distribution](docs/images/error_distribution.png)
+
+---
+
+### Error vs IC50 Range
+
+Models perform best in the mid-range IC50 values and struggle more at the extremes.
+
+![Error vs IC50](docs/images/error_vs_ic50.png)
+
+---
+
+### Hardest and Easiest Drugs to Predict
+
+Top 20 hardest-to-predict drugs (by mean absolute error) and the top 20 easiest.
+
+![Hardest and Easiest Drugs](docs/images/hardest_easiest_drugs.png)
+
+---
+
+### Error by Tissue Type
+
+Mean absolute error broken down by cancer tissue type and sample counts per tissue.
+
+![Error by Tissue](docs/images/error_by_tissue.png)
+
+---
+
+### Drug–Tissue Error Heatmap
+
+Cross-tabulation of error for the top 15 hardest drugs across the top 10 most common tissue types.
+
+![Drug-Tissue Heatmap](docs/images/drug_tissue_heatmap.png)
+
+---
+
+### Feature Importance (LightGBM)
+
+Top 20 gene expression principal components by Gain importance and Split Count.
+
+![Feature Importance Top 20](docs/images/feature_importance_top20.png)
+
+---
+
+### PC Importance Analysis
+
+Feature importance scatter across all 512 PCs, cumulative importance curve, and distribution of gain values.
+
+![PC Importance Analysis](docs/images/pc_importance_analysis.png)
+
+---
+
 ### Ablation Studies
 
 Feature contribution analysis:
