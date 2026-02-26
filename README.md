@@ -468,6 +468,38 @@ Feature importance scatter across all 512 PCs, cumulative importance curve, and 
 
 ---
 
+### Ensemble Model: Metric Comparison
+
+Ensemble strategies (Weighted, Rank Average, Simple Average) compared against individual models across Spearman, RMSE, and MAE.
+
+![Ensemble Metric Comparison](docs/images/ensemble_metric_comparison.png)
+
+---
+
+### Ensemble Model: Optimized Weights
+
+The optimizer allocates 68% weight to MLP + ChemBERTa and 32% to MLP Baseline.
+
+![Ensemble Weights](docs/images/ensemble_weights.png)
+
+---
+
+### Ensemble Model: Prediction Scatter
+
+Predicted vs. true LN(IC50) for the best individual model (MLP + ChemBERTa) and the weighted ensemble.
+
+![Ensemble Prediction Scatter](docs/images/ensemble_prediction_scatter.png)
+
+---
+
+### Ensemble Model: Model Diversity (Distance Matrix)
+
+Pairwise prediction distance and hierarchical clustering. A larger distance (0.327) indicates complementary models suitable for ensembling.
+
+![Ensemble Distance Matrix](docs/images/ensemble_distance_matrix.png)
+
+---
+
 ### Ablation Studies
 
 Feature contribution analysis:
