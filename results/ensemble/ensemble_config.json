@@ -1,0 +1,11 @@
+{
+  "ensemble_type": "weighted",
+  "models_used": [
+    "MLP Baseline",
+    "MLP + ChemBERTa"
+  ],
+  "n_models": 2,
+  "test_spearman": 0.42247670073983584,
+  "test_rmse": 2.5057385004889623,
+  "test_mae": 1.9740277344986579
+}
