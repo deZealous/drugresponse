@@ -80,6 +80,11 @@ drug_response_prediction/
 │   ├── gnn_baseline/                # Graph Neural Network baseline
 │   ├── gnn_tuned/                   # Hyperparameter-tuned GNN
 │   ├── chemberta_finetune/          # Fine-tuned ChemBERTa for regression
+│   ├── ensemble/                    # Ensemble model outputs 🎭
+│   │   ├── ensemble_config.json     # Ensemble strategy configuration
+│   │   ├── optimal_weights.csv      # Optimized model weights
+│   │   ├── test_preds.npy           # Final ensemble test predictions
+│   │   └── metrics_test.csv         # Ensemble test metrics
 │   └── ablation_studies/            # Ablation experiment results
 │
 ├── 🏗️ src/                          # Source modules
